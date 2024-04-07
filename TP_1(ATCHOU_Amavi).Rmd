@@ -1,0 +1,291 @@
+---
+author: "Anna ATCHOU"  
+output: html_document
+title: Travaux_pratique1
+
+ 
+---
+
+
+
+# Contexte
+
+L’objectif de ce projet est que vous appliquiez les outils que vous avez étudiés dans le cours du logiciel statistique R, dans le cas d’une étude de cas réelle.
+# II-	Importation et mise en forme 
+
+## II-1	Importation la base de données 
+
+```{r}
+library(readxl)  
+projet<- read_excel("C:/Users/HP/Documents/ISE_1_Eco/R_cours/TPR_1/donnees/Base_Projet.xlsx")
+View(projet)
+```
+## II-2	Nombre de ligne et de colonne
+
+Pour obtenir le nombre de lignes et de colonnes de notre base de données dans R, nous allons utiliser la fonction dim(). la fonction dim() vous donne les dimensions de la base sous la forme d'un vecteur contenant le nombre de lignes et de colonnes.
+
+```{r}
+dimension <- dim(projet) # sors les dimensions de notre base (lignes et colonnes)
+
+print("Nombre de PME :")
+print(dimension[1]) # le nombre de ligne
+print(dimension[2]) # le nombre de colonne
+```
+Les resultats de notre code nous montre que notre base contient 250 lignes et 33 colonnes. Dans notre contexte d'étude, 250 PME et 33 variableiables.
+
+## II-3 Vérification de la présence des valeurs manquantes
+ 
+Ce code vérifie s'il y a des valeurs manquantes pour la variableiable key en utilisant la fonction is.na(). Ensuite, il utilise la fonction which() pour identifier les indices des lignes avec des valeurs manquantes.
+
+```{r}
+# Vérifie s'il y a des valeurs manquantes pour la variable "key"
+VM <- is.na(projet$key) # le $ nous permet d'indexer directement notre variable dans la base
+VM
+# Identifie les lignes avec des valeurs manquantes pour "key"
+WVM <- which(VM=="TRUE")
+print("l'entreprise pour laquelle il y a une valeur manquante se trouve à")
+WVM
+```
+
+D'après les résultats, il n'y a pas de valeurs manquantes pour la variable "Key" dans notre base. En effet, le code avc la fonction is.na() renvoie un booléen ne conteneant que des FALSE, ce qui entraine au niveau de which() integer(0) puisque il ne trouve pas de valeur où c'est TRUE.
+
+# III-	Création de variables
+## Recodage des variables q1, q2, q23
+
+Pour renommer les variable q1, q2 et q23 nous allons utiliser la fonction rename de la bibliothèque dplyr en R
+```{r}
+library(dplyr) # appel de la librairie dplyr
+projet <- projet %>% rename(region = q1) # renomme q1 en region
+projet <- projet %>% rename(departement = q2) # renomme q2 en departement
+projet <- projet %>% rename(sexe = q23) # renomme q23 en sexe
+```
+## Créqtion de la variable sexe_2 et du dataframe langues
+
+La fonction mutate est utilisée pour créer une nouvelle colonne appelée sexe2 dans le data frame projet. Ensuite on utilise une comparaison booléenne pour vérifier si chaque élément de sexe est égal à "Femme". L'expression sexe == "Femme" retourne un vecteur de valeurs booléennes (TRUE si l'élément est "Femme", FALSE sinon), puis la fonction as.numeric() est utilisée pour convertir ces valeurs booléennes en valeurs numériques (1 pour TRUE et 0 pour FALSE).
+```{r}
+library(dplyr) # appel de la librairie dplyr
+projet <- projet %>% mutate(sexe_2 = as.numeric(sexe == "Femme"))
+projet # pour voir la base
+
+# Création du data.frame langues en utilisant la fonction select
+langues <- projet %>%select(key,starts_with("q24a_")) #Nous utilisons la fonction select de dplyr pour sélectionner les variables et starts_with pour sélectionner les variables commençant par q24a_
+langues
+```
+## Créqtion de la variable parle
+
+Pour cela, nous allons nous interesser à la combinaison des fonctions mutate, across et rowSums
+mutate est utilisé pour ajouter une nouvelle variable nommée parle.
+across est utilisé pour sélectionner les colonnes de q24a_1 à q24a_10.
+rowSums est utilisé pour calculer la somme de chaque ligne.
+```{r}
+langues <- langues %>% mutate(parle =rowSums( across(q24a_1:q24a_10)))
+langues
+```
+
+## Sélection et fusion de base
+
+Nous utilisons select pour sélectionner uniquement les variables key et parle dans le data.frame langues.
+Ensuite, nous utilisons merge pour fusionner les data.frames projet et langues en utilisant la variable key comme clé de fusion.
+
+```{r}
+langues <- langues%>%select(key, parle) # sélectionne parle et Key dans la base projet et le met dans la base langues
+langues
+
+projet <- merge(projet, langues, by = "key") #Fusionner les data.frames projet et langues
+projet
+```
+
+# 	Analyses descriptives 
+
+## création de la fonction univar pour les statistiques univariées
+
+Il s'agit d'une fonction nommée univar qui prend deux arguments : data et variable.
+data est l'ensemble de données à partir duquel les statistiques descriptives seront calculées et variable est la variable pour laquelle les statistiques descriptives seront calculées.
+Ensuite,La fonction freq() est utilisée pour calculer les statistiques descriptives de la variable fournie en argument. En terme de graphique,Si la variable est qualitative, un diagramme en barres est créé à l'aide de barplot() avec le nombre d'occurrences de chaque modalité de la variable en ordonnée.
+Si la variable est quantitative, un histogramme est créé à l'aide de hist() pour visualiser la distribution des valeurs.
+```{r}
+library(janitor)
+library(gtsummary)
+library(questionr)
+# Fonction pour les statistiques descriptives univariées
+univar <- function(data, variable) 
+{
+stats=freq(variable,cum = TRUE, total = TRUE, sort = "inc", digits = 2, exclude = NA)
+cat("STATISTIQUES de ",as.character(substitute(variable)), ":\n")
+print(stats)
+
+  # Identifier le type de variable (qualitative ou quantitative)
+variable_type <- ifelse(is.factor(variable) || is.character(variable), "Qualitative", "Quantitative")
+  
+  # Affichage des statistiques descriptives en fonction du type de variableiable
+   if (variable_type == "Qualitative") {
+    
+    barplot(table(variable), main = paste("Diagramme en barres de", deparse(substitute(variable))), xlab = deparse(substitute(variable)), ylab = "Fréquence",col=  "sienna3" )
+    
+ } else {
+   
+    hist(variable, main = paste("Histogramme de", deparse(substitute(variable))),breaks = "Sturges", xlab = deparse(substitute(variable)), ylab = "Fréquence",col= "turquoise3")
+ }
+attach(data)
+}
+
+
+
+
+
+```
+
+## création de la fonction bivar pour les statistiques bivariées
+
+Ce code est une fonction nommée bivar qui prend trois arguments : data, variable1, et variable2.La fonction commence par vérifier le type des variables données en entrée. Elle utilise les fonctions is.factor() et is.character() pour déterminer si les variables sont qualitatives, et si ce n'est pas le cas, elle les considère comme quantitatives.
+
+**Si les deux variables sont qualitatives, elle crée une table de contingence (xtabs) entre les deux variables et calcule les proportions conditionnelles (cprop). Ensuite, elle génère un diagramme à barres (geom_bar) 
+
+**Si les deux variables sont quantitatives, elle crée un nuage de points (geom_point) pour visualiser la relation entre les deux variables
+
+**Si une variable est quantitative et l'autre qualitative, elle crée un boxplot (geom_boxplot) pour visualiser la distribution de la variable quantitative pour chaque niveau de la variable qualitative.
+
+```{r}
+library(ggplot2)
+
+
+bivar <- function(data, variable1, variable2) {
+  
+  # vérification du type de la variable
+variable_type1 <- ifelse(is.factor(variable1) || is.character(variable1), "Qualitative", "Quantitative")
+variable_type2 <- ifelse(is.factor(variable2) || is.character(variable2), "Qualitative", "Quantitative")
+ 
+# statistiques selon les types
+
+if (variable_type1 == "Qualitative" & variable_type2 == "Qualitative"){
+  tab <- xtabs(~ variable1 + variable2, data)
+  stats=cprop(tab)
+  print(stats)
+  # graphiques 
+ graph=ggplot(data) +aes(x = variable1, fill = variable2) +geom_bar(position = "dodge") +xlab("")  +ylab("") +labs(title = paste("Diagramme entre", deparse(substitute(variable1)), "et",  deparse(substitute(variable2))), x = deparse(substitute(variable1)), y = "Proportion")
+print(graph)
+}
+if (variable_type1 == "Quantitative" & variable_type2 == "Quantitative"){
+ tab <- xtabs(~ variable1 + variable2, data)
+  stats=cprop(tab)
+  print(stats)
+  #Calcul de la corrélation entre les deux variables
+ corr <- cor(variable1,variable2)
+ cat("Corrélation entre", deparse(substitute(variable1)), "et", deparse(substitute(variable2)), ":", corr, "\n")
+ print(corr)
+ # graphique
+ graph2 <- ggplot(data)+ aes(x = variable1, y = variable2) +geom_point(colour = "turquoise4", alpha = .2)  +labs(title = paste("Nuage de points entre", deparse(substitute(variable1)), "et",   deparse(substitute(variable2))), x = deparse(substitute(variable1)), y = deparse(substitute(variable2)))
+    
+print(graph2)
+  
+
+}
+if (variable_type1 == "Quantitative" & variable_type2 == "Qualitative" ){
+  tab <- xtabs(~ variable1 + variable2, data)
+  stats=cprop(tab)
+  print(stats)
+  
+  
+  # création du boxplot
+  graph3 <- ggplot(data, aes(x = variable2,y =variable1)) +
+      geom_boxplot() +
+      labs(title = paste("Boxplot de", deparse(substitute(variable1)), "par", deparse(substitute(variable2))), x = deparse(substitute(variable2)), y = deparse(substitute(variable1)))
+    
+    print(graph3)
+}
+attach(data)
+}
+
+```
+Avant de passer à l'analyse descriptive nous allons faire certains recodage.
+## recodage des variables q12, q25, q81 
+```{r}
+projet <- projet %>% rename(statut_juridique = q12) 
+projet <- projet %>% rename(niveau_instruction = q25) 
+projet <- projet %>% rename(Propriétaire_locataire = q81) 
+
+```
+## Répartition de la variable sexe
+```{r}
+attach(projet)
+univar(projet,sexe)
+```
+Interprétation
+
+D'après les résultats le nombre d'homme qui dirige une PME est supérieur à celui des femme. En proportion 23,6% de femme contre 76,4% d'homme.
+
+## Répartition de la variable niveau d'instruction
+```{r}
+attach(projet)
+univar(projet,niveau_instruction)
+```
+Interprétation
+
+La variable niveau_instruction possède 4 modalités. La majorité des dirigeants de PME n'ont aucun niveau d'instruction(31,6%). Le niveau primaire a une proportion de 22,4 parmi les dirigeants.
+
+## Répartition de la variable statut_juridique
+```{r}
+attach(projet)
+univar(projet,statut_juridique)
+```
+Interprétation
+
+le statut juridique GIE est le plus présent avec une proportion dee 71,6% , suivi des PME Informel (15,2%).Les associations sont les statuts les moins présents.
+## Répartition de la variable propriétaire/locataire
+```{r}
+attach(projet)
+univar(projet,Propriétaire_locataire)
+```
+Interprétation
+
+Les propriétaires dominent sur les locataires. 90,4% de propriétaires contre 9,6% de locataires.
+
+## Répartition de la variable statut_juridique et sexe
+```{r}
+attach(projet)
+bivar(projet,sexe,statut_juridique)
+```
+Interprétation
+
+Dans le secteur informel , les femmes dominent avec 84,2% contre 15,8% d'homme.La proportion de PME en association sachant que c'est une femme qui dirige est la même que pour les hommes: 50%.
+
+## Répartition de la variable niveau_instruction et sexe
+```{r}
+attach(projet)
+bivar(projet,sexe,niveau_instruction)
+```
+Interprétation
+
+## Répartition de la variable Propriétaire/locataire et sexe
+```{r}
+attach(projet)
+bivar(projet,sexe,Propriétaire_locataire)
+```
+Interprétation
+Parmi les propriétaire il y a plus de femme que d'homme.Avec une proportion de 77,4% contre 23,6%.
+# Analyse descriptive des PME selon la filière
+
+## filière arachide
+```{r}
+attach(projet)
+univar(projet,filiere_1)
+```
+Interprétation
+Pour l'analyse de la filère Arachide, nous constatons que 42,3% des PME y sont présent contre 56,8% de PME qui n'y sont pas.
+
+## filière Riz
+```{r}
+attach(projet)
+univar(projet,filiere_4)
+```
+Interprétation
+Pour la filière riz plus de 60% des PME ne sont pas présents contre une proportion de 36,8% qui y sont.
+
+## Répartion du nombre de femme et d'homme dans la filière riz
+```{r}
+attach(projet)
+bivar(projet,filiere_4,sexe)
+```
+Interprétation
+
+Pour la filière du riz, parmi les PME dont les dirigeants sont des femmes, 40,3% y sont contre 25,4% pour les hommes.
